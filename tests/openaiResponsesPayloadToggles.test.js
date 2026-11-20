@@ -180,6 +180,48 @@ describe('openai responses payload toggles', () => {
     openaiAccountService.decrypt.mockReturnValue('decrypted-token')
   })
 
+  test.each(['/v1/responses', '/v1/responses/compact'])(
+    'rejects a restricted Astra model on %s before account selection',
+    async (path) => {
+      const req = createReq({
+        path,
+        body: { model: 'gpt-6.2-astra' },
+        apiKeyOverrides: {
+          enableModelRestriction: true,
+          restrictedModels: ['gpt-6.2-astra']
+        }
+      })
+      const res = createRes()
+
+      await openaiRoutes.handleResponses(req, res)
+
+      expect(res.statusCode).toBe(403)
+      expect(res.payload.error.code).toBe('model_restricted')
+      expect(unifiedOpenAIScheduler.selectAccountForApiKey).not.toHaveBeenCalled()
+    }
+  )
+
+  test('rejects a restricted model introduced by payload rules', async () => {
+    const req = createReq({
+      body: { model: 'gpt-5' },
+      apiKeyOverrides: {
+        enableModelRestriction: true,
+        restrictedModels: ['gpt-6-astra'],
+        enableOpenAIResponsesPayloadRules: true,
+        openaiResponsesPayloadRules: [
+          { path: 'model', valueType: 'string', value: 'gpt-6-astra' }
+        ]
+      }
+    })
+    const res = createRes()
+
+    await openaiRoutes.handleResponses(req, res)
+
+    expect(res.statusCode).toBe(403)
+    expect(openaiResponsesRelayService.handleRequest).not.toHaveBeenCalled()
+    expect(axios.post).not.toHaveBeenCalled()
+  })
+
   test('keeps standard responses payload unchanged for openai-responses when both toggles are off', async () => {
     const req = createReq({
       body: {
