@@ -35,6 +35,20 @@ function checkOpenAIPermissions(apiKeyData) {
   return apiKeyService.hasPermission(apiKeyData?.permissions, 'openai')
 }
 
+function isModelRestricted(apiKey, model) {
+  return apiKey.enableModelRestriction && apiKey.restrictedModels?.includes(model)
+}
+
+function rejectRestrictedModel(res) {
+  return res.status(403).json({
+    error: {
+      message: 'This API key does not have permission to use the requested model',
+      type: 'permission_denied',
+      code: 'model_restricted'
+    }
+  })
+}
+
 function normalizeHeaders(headers = {}) {
   if (!headers || typeof headers !== 'object') {
     return {}
@@ -316,6 +330,10 @@ const handleResponses = async (req, res) => {
       })
     }
 
+    if (isModelRestricted(apiKeyData, req.body?.model)) {
+      return rejectRestrictedModel(res)
+    }
+
     // 判断是否为 Codex CLI 的请求（基于 User-Agent）
     // 支持: codex_vscode, codex_cli_rs, codex_exec (非交互式/脚本模式)
     const userAgent = req.headers['user-agent'] || ''
@@ -375,6 +393,10 @@ const handleResponses = async (req, res) => {
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
     const requestedModel = req.body?.model || null
+    if (isModelRestricted(apiKeyData, requestedModel)) {
+      return rejectRestrictedModel(res)
+    }
+
     const schedulerModel = getCodexCompatibleModel(requestedModel)
     const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
 
@@ -395,6 +417,10 @@ const handleResponses = async (req, res) => {
     if (accountType === 'openai-responses') {
       logger.info(`🔀 Using OpenAI-Responses relay service for account: ${account.name}`)
       return await openaiResponsesRelayService.handleRequest(req, res, account, apiKeyData)
+    }
+
+    if (isModelRestricted(apiKeyData, schedulerModel)) {
+      return rejectRestrictedModel(res)
     }
 
     if (schedulerModel !== requestedModel) {
