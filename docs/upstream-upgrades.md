@@ -1,6 +1,6 @@
 # 私库升级与部署
 
-origin 指向 ryan129-dev/claude-relay-service，upstream 指向 Wei-Shaw/claude-relay-service。私库 main 维护经审阅的定制源码。新克隆可用以下命令添加作者仓库。
+origin 指向 ryan129-dev/crs-maintenance，upstream 指向 Wei-Shaw/claude-relay-service。私库 main 维护经审阅的定制源码。新克隆可用以下命令添加作者仓库。
 
 ```sh
 git remote add upstream https://github.com/Wei-Shaw/claude-relay-service.git
